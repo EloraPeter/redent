@@ -41,3 +41,10 @@ body {
   font-family: system-ui, sans-serif;
   transition: background-color 0.3s, color 0.3s;
 }
+
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
