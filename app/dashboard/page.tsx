@@ -39,22 +39,22 @@ export default function DashboardPage() {
 
         {/* Upcoming Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+          <div className="p-4 card rounded shadow">
             <h3 className="font-semibold mb-2">Your Courses</h3>
             <p>Course list and timetable will appear here.</p>
           </div>
 
-          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+          <div className="p-4 card rounded shadow">
             <h3 className="font-semibold mb-2">Assignments</h3>
             <p>Track upcoming deadlines and progress here.</p>
           </div>
 
-          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+          <div className="p-4 card rounded shadow">
             <h3 className="font-semibold mb-2">Morning Routine</h3>
             <p>Smart wake-up alerts and prep schedule will appear here.</p>
           </div>
 
-          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+          <div className="p-4 card rounded shadow">
             <h3 className="font-semibold mb-2">Notifications</h3>
             <p>All reminders, weekly summaries, and alerts.</p>
           </div>
