@@ -8,6 +8,7 @@ export const fetchCourses = async (userId: string) => {
     .eq("user_id", userId)
     .order("day", { ascending: true });
   if (error) throw error;
+  
   return data;
 };
 
