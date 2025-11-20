@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -17,12 +18,20 @@ export default function Home() {
         </p>
 
         <div className="mt-8 flex justify-center gap-4">
-          <button className="rounded-full bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700 transition">
+          <Link
+            href="/login"
+            className="rounded-full bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700 transition inline-block"
+          >
             Get Started
-          </button>
-          <button className="rounded-full border border-zinc-300 px-6 py-3 text-zinc-800 dark:text-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition">
+          </Link>
+
+          <Link
+            href="/login"
+            className="rounded-full border border-zinc-300 px-6 py-3 text-zinc-800 dark:text-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition inline-block"
+          >
             Login
-          </button>
+          </Link>
+
         </div>
       </section>
 
