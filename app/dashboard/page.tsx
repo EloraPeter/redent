@@ -1,0 +1,61 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+
+export default function DashboardPage() {
+  const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login?mode=login");
+    }
+  }, [user, loading, router]);
+
+  if (loading) return <p className="p-8 text-center">Loading...</p>;
+  if (!user) return null; // redirect handled in useEffect
+
+  return (
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-50">
+      <header className="flex justify-between items-center p-6 bg-white dark:bg-zinc-900 shadow-md">
+        <h1 className="text-2xl font-bold">Redent Dashboard</h1>
+        <button
+          onClick={signOut}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+        >
+          Sign Out
+        </button>
+      </header>
+
+      <main className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Welcome, {user.email}</h2>
+
+        {/* Upcoming Features */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+            <h3 className="font-semibold mb-2">Your Courses</h3>
+            <p>Course list and timetable will appear here.</p>
+          </div>
+
+          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+            <h3 className="font-semibold mb-2">Assignments</h3>
+            <p>Track upcoming deadlines and progress here.</p>
+          </div>
+
+          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+            <h3 className="font-semibold mb-2">Morning Routine</h3>
+            <p>Smart wake-up alerts and prep schedule will appear here.</p>
+          </div>
+
+          <div className="p-4 bg-white dark:bg-zinc-800 rounded shadow">
+            <h3 className="font-semibold mb-2">Notifications</h3>
+            <p>All reminders, weekly summaries, and alerts.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
