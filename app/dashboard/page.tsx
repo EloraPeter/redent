@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import DarkModeToggle from "@/components/DarkModeToggle";
+import CoursesManager from "@/components/CoursesManager";
+
 
 
 export default function DashboardPage() {
@@ -24,7 +26,7 @@ export default function DashboardPage() {
     <div className="min-h-screen">
       <header className="flex justify-between items-center p-6 shadow-md">
         <h1 className="text-2xl font-bold">Redent Dashboard</h1>
-              <DarkModeToggle />
+        <DarkModeToggle />
 
         <button
           onClick={signOut}
@@ -33,6 +35,8 @@ export default function DashboardPage() {
           Sign Out
         </button>
       </header>
+      <CoursesManager />
+
 
       <main className="p-6">
         <h2 className="text-xl font-semibold mb-4">Welcome, {user.email}</h2>
