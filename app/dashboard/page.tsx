@@ -21,8 +21,8 @@ export default function DashboardPage() {
   if (!user) return null; // redirect handled in useEffect
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-50">
-      <header className="flex justify-between items-center p-6 bg-white dark:bg-zinc-900 shadow-md">
+    <div className="min-h-screen">
+      <header className="flex justify-between items-center p-6 shadow-md">
         <h1 className="text-2xl font-bold">Redent Dashboard</h1>
               <DarkModeToggle />
 
