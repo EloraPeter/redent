@@ -1,6 +1,5 @@
 // lib/courseApi.ts
-import { supabase } from "./supabase"; // adjust path if your supabase client is in lib/supabase.ts
-
+import { supabase } from "./supabase";
 export const fetchCourses = async (userId: string) => {
   const { data, error } = await supabase
     .from("courses")
