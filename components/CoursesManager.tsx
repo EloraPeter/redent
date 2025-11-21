@@ -21,6 +21,7 @@ export default function CoursesManager() {
   const [courseId, setCourseId] = useState<string | "">(""); // choose an existing course
   const [titleFreeText, setTitleFreeText] = useState(""); // optional: for quick create without courses table
   const [day, setDay] = useState("");
+  const [courseCode, setCourseCode] = useState(""); // <-- Add this
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
@@ -64,7 +65,7 @@ export default function CoursesManager() {
       if (existingCourse) {
         finalCourseId = existingCourse.id;
       } else {
-        const newCourse = { title: titleFreeText.trim(), code: "", user_id: user.id };
+        const newCourse = { title: titleFreeText.trim(), code: courseCode.trim(), user_id: user.id };
         const createdCourse = await addCourse(newCourse);
         if (!createdCourse || createdCourse.length === 0) {
           alert("Failed to create course. Please try again.");
@@ -144,11 +145,11 @@ export default function CoursesManager() {
         <input
           type="text"
           placeholder="Course code (optional)"
-          value={courseId ? courses.find(c => c.id === courseId)?.code ?? "" : ""}
-          onChange={() => { }}
+          value={courseCode}        // create a new state: const [courseCode, setCourseCode] = useState("")
+          onChange={e => setCourseCode(e.target.value)}
           className="p-2 border rounded"
-          disabled
         />
+
 
         {/* Schedule fields */}
         <input
