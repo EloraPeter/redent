@@ -62,12 +62,21 @@ export default function CoursesManager() {
     if (!courseId && titleFreeText.trim()) {
       const newCourse = {
         title: titleFreeText.trim(),
-        code: "", // optional
+        code: "",
         user_id: user.id,
       };
+
       const createdCourse = await addCourse(newCourse);
-      finalCourseId = createdCourse[0].id; // Supabase returns array
+
+      if (!createdCourse || createdCourse.length === 0) {
+        alert("Failed to create course. Please try again.");
+        return;
+      }
+
+      finalCourseId = createdCourse[0].id; // ✅ now TypeScript is happy
     }
+
+
 
     if (!finalCourseId) {
       alert("Please select an existing course or enter a new course title.");

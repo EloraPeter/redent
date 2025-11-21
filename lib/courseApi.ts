@@ -78,11 +78,16 @@ export const fetchCourses = async () => {
   return data as Course[];
 };
 
-export const addCourse = async (course: Partial<Course>) => {
+export const addCourse = async (course: Partial<Course>): Promise<Course[]> => {
   const { data, error } = await supabase
     .from("courses")
     .insert([course]);
 
   if (error) throw error;
-  return data;
+
+  // handle possible null safely
+  if (!data) return [];
+  
+  return data as Course[];
 };
+
