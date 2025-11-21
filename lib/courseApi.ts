@@ -83,11 +83,13 @@ export const addCourse = async (course: Partial<Course>): Promise<Course[]> => {
     .from("courses")
     .insert([course]);
 
-  if (error) throw error;
-
+  if (error) {
+    console.error("Supabase insert error:", error);
+    throw error;
+  }
   // handle possible null safely
   if (!data) return [];
-  
+
   return data as Course[];
 };
 
