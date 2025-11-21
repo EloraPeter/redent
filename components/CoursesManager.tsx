@@ -65,7 +65,7 @@ export default function CoursesManager() {
       if (existingCourse) {
         finalCourseId = existingCourse.id;
       } else {
-        const newCourse = { title: titleFreeText.trim(), code: courseCode.trim(), user_id: user.id };
+        const newCourse = { title: titleFreeText.trim(), code: courseCode.trim() || "-", user_id: user.id };
         const createdCourse = await addCourse(newCourse);
         if (!createdCourse || createdCourse.length === 0) {
           alert("Failed to create course. Please try again.");
