@@ -133,37 +133,64 @@ export default function CoursesManager() {
   return (
     <div className="p-4">
       <form onSubmit={handleSubmit} className="mb-6 grid gap-2 sm:grid-cols-2">
-        {/* Course dropdown (preferred) */}
-        <select
-          value={courseId}
-          onChange={e => setCourseId(e.target.value)}
-          className="p-2 border rounded"
-        >
-          <option value="">Select course...</option>
-          {courses.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.title} ({c.code ?? ""})
-            </option>
-          ))}
-        </select>
-
-        {/* Optional: free-text quick title (if you want auto-create behaviour later) */}
+        {/* Course title (either select or type a new one) */}
         <input
           type="text"
-          placeholder="Or quick course title (optional)"
+          placeholder="Course title"
           value={titleFreeText}
           onChange={e => setTitleFreeText(e.target.value)}
           className="p-2 border rounded"
+          required
         />
 
-        <input type="text" placeholder="Day" value={day} onChange={e => setDay(e.target.value)} className="p-2 border rounded" />
-        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="p-2 border rounded" />
-        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="p-2 border rounded" />
-        <input type="text" placeholder="Location" value={location} onChange={e => setLocation(e.target.value)} className="p-2 border rounded" />
-        <button type="submit" className="p-2 bg-indigo-600 text-white rounded">
-          {editingId ? "Update Schedule" : "Add Schedule"}
+        <input
+          type="text"
+          placeholder="Course code (optional)"
+          value={courseId ? courses.find(c => c.id === courseId)?.code ?? "" : ""}
+          onChange={() => { }}
+          className="p-2 border rounded"
+          disabled
+        />
+
+        {/* Schedule fields */}
+        <input
+          type="text"
+          placeholder="Day"
+          value={day}
+          onChange={e => setDay(e.target.value)}
+          className="p-2 border rounded"
+          required
+        />
+        <input
+          type="time"
+          value={startTime}
+          onChange={e => setStartTime(e.target.value)}
+          className="p-2 border rounded"
+          required
+        />
+        <input
+          type="time"
+          value={endTime}
+          onChange={e => setEndTime(e.target.value)}
+          className="p-2 border rounded"
+          required
+        />
+        <input
+          type="text"
+          placeholder="Location"
+          value={location}
+          onChange={e => setLocation(e.target.value)}
+          className="p-2 border rounded"
+        />
+
+        <button
+          type="submit"
+          className="p-2 bg-indigo-600 text-white rounded"
+        >
+          {editingId ? "Update Schedule" : "Add Course & Schedule"}
         </button>
       </form>
+
 
       <div className="grid gap-2">
         {schedules.map(s => (
