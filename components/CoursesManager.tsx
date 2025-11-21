@@ -102,6 +102,7 @@ export default function CoursesManager() {
     // Reset form
     setCourseId("");
     setTitleFreeText("");
+    setCourseCode(""); // <-- reset here
     setDay("");
     setStartTime("");
     setEndTime("");
