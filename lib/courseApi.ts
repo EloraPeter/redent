@@ -93,3 +93,14 @@ export const addCourse = async (course: Partial<Course>): Promise<Course[]> => {
   return data as Course[];
 };
 
+export const updateCourse = async (id: string, updates: Partial<Course>) => {
+  const { data, error } = await supabase
+    .from("courses")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) throw error;
+  return (data ?? []) as Course[];
+};
+
+

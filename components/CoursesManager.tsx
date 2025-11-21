@@ -10,7 +10,10 @@ import {
   deleteSchedule,
   fetchCourses as fetchCourseList,
   addCourse,
+  updateCourse,
 } from "@/lib/courseApi";
+import type { CourseSchedule } from "@/lib/courseApi";
+
 
 export default function CoursesManager() {
   const { user } = useAuth();
@@ -92,11 +95,24 @@ export default function CoursesManager() {
     };
 
     if (editingId) {
+      // 1. update schedule
       await updateSchedule(editingId, schedulePayload);
+
+      // 2. update course if title/code changed
+      if (courseId && titleFreeText.trim()) {
+        await updateCourse(courseId, {
+          title: titleFreeText.trim(),
+          code: courseCode.trim() || "-"
+        });
+        await loadCourses(); // refresh courses list
+      }
+
       setEditingId(null);
     } else {
+      // add new schedule / course (your existing logic)
       await addSchedule(schedulePayload);
     }
+
 
     await load();
     // Reset form
@@ -110,15 +126,25 @@ export default function CoursesManager() {
   };
 
 
-  const handleEdit = (s: any) => {
+  const handleEdit = (s: CourseSchedule) => {
     setEditingId(s.id);
     setCourseId(s.course_id);
-    setTitleFreeText(""); // for when creating course on the fly
+
+    // fill course info if available
+    if (s.courses) {
+      setTitleFreeText(s.courses.title ?? "");
+      setCourseCode(s.courses.code ?? "");
+    } else {
+      setTitleFreeText("");
+      setCourseCode("");
+    }
+
     setDay(s.day);
-    setStartTime(s.start_time?.slice(0, 5) ?? ""); // if stored as "HH:MM:SS"
+    setStartTime(s.start_time?.slice(0, 5) ?? "");
     setEndTime(s.end_time?.slice(0, 5) ?? "");
     setLocation(s.location ?? "");
   };
+
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this schedule?")) return;
