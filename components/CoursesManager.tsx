@@ -9,6 +9,7 @@ import {
   updateSchedule,
   deleteSchedule,
   fetchCourses as fetchCourseList,
+  addCourse,
 } from "@/lib/courseApi";
 
 export default function CoursesManager() {
@@ -55,19 +56,26 @@ export default function CoursesManager() {
     e.preventDefault();
     if (!user) return;
 
-    // If user selected an existing course, use its id.
-    // Otherwise you can either:
-    //  - create a new course row first (call addCourse) and use that id, or
-    //  - keep title as free-text in the UI and set course_id = null (but schema requires course_id).
-    // Below I'll assume we require a course row. If you want to auto-create course rows from titleFreeText,
-    // call your addCourse helper before creating schedule.
-    if (!courseId) {
-      alert("Please select a course (or create one in Courses).");
+    let finalCourseId = courseId;
+
+    // If user typed a new course
+    if (!courseId && titleFreeText.trim()) {
+      const newCourse = {
+        title: titleFreeText.trim(),
+        code: "", // optional
+        user_id: user.id,
+      };
+      const createdCourse = await addCourse(newCourse);
+      finalCourseId = createdCourse[0].id; // Supabase returns array
+    }
+
+    if (!finalCourseId) {
+      alert("Please select an existing course or enter a new course title.");
       return;
     }
 
-    const payload = {
-      course_id: courseId,
+    const schedulePayload = {
+      course_id: finalCourseId,
       user_id: user.id,
       day,
       start_time: startTime,
@@ -75,33 +83,31 @@ export default function CoursesManager() {
       location,
     };
 
-    try {
-      if (editingId) {
-        await updateSchedule(editingId, payload);
-        setEditingId(null);
-      } else {
-        await addSchedule(payload);
-      }
-      await load();
-      // reset form
-      setCourseId("");
-      setTitleFreeText("");
-      setDay("");
-      setStartTime("");
-      setEndTime("");
-      setLocation("");
-    } catch (err: any) {
-      console.error(err.message ?? err);
+    if (editingId) {
+      await updateSchedule(editingId, schedulePayload);
+      setEditingId(null);
+    } else {
+      await addSchedule(schedulePayload);
     }
+
+    await load();
+    // Reset form
+    setCourseId("");
+    setTitleFreeText("");
+    setDay("");
+    setStartTime("");
+    setEndTime("");
+    setLocation("");
   };
+
 
   const handleEdit = (s: any) => {
     setEditingId(s.id);
     setCourseId(s.course_id);
     setTitleFreeText(""); // for when creating course on the fly
     setDay(s.day);
-    setStartTime(s.start_time?.slice(0,5) ?? ""); // if stored as "HH:MM:SS"
-    setEndTime(s.end_time?.slice(0,5) ?? "");
+    setStartTime(s.start_time?.slice(0, 5) ?? ""); // if stored as "HH:MM:SS"
+    setEndTime(s.end_time?.slice(0, 5) ?? "");
     setLocation(s.location ?? "");
   };
 
@@ -141,10 +147,10 @@ export default function CoursesManager() {
           className="p-2 border rounded"
         />
 
-        <input type="text" placeholder="Day" value={day} onChange={e => setDay(e.target.value)} className="p-2 border rounded"/>
-        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="p-2 border rounded"/>
-        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="p-2 border rounded"/>
-        <input type="text" placeholder="Location" value={location} onChange={e => setLocation(e.target.value)} className="p-2 border rounded"/>
+        <input type="text" placeholder="Day" value={day} onChange={e => setDay(e.target.value)} className="p-2 border rounded" />
+        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="p-2 border rounded" />
+        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="p-2 border rounded" />
+        <input type="text" placeholder="Location" value={location} onChange={e => setLocation(e.target.value)} className="p-2 border rounded" />
         <button type="submit" className="p-2 bg-indigo-600 text-white rounded">
           {editingId ? "Update Schedule" : "Add Schedule"}
         </button>
@@ -154,7 +160,7 @@ export default function CoursesManager() {
         {schedules.map(s => (
           <div key={s.id} className="p-2 border rounded flex justify-between items-center">
             <div>
-              <strong>{s.courses?.title ?? "Untitled course"}</strong> — {s.day} {s.start_time?.slice(0,5) ?? ""}–{s.end_time?.slice(0,5) ?? ""} @ {s.location}
+              <strong>{s.courses?.title ?? "Untitled course"}</strong> — {s.day} {s.start_time?.slice(0, 5) ?? ""}–{s.end_time?.slice(0, 5) ?? ""} @ {s.location}
             </div>
             <div className="flex gap-2">
               <button onClick={() => handleEdit(s)} className="text-blue-600">Edit</button>
