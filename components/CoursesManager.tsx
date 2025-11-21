@@ -59,27 +59,25 @@ export default function CoursesManager() {
     let finalCourseId = courseId;
 
     // If user typed a new course
-    if (!courseId && titleFreeText.trim()) {
-      const newCourse = {
-        title: titleFreeText.trim(),
-        code: "",
-        user_id: user.id,
-      };
-
-      const createdCourse = await addCourse(newCourse);
-
-      if (!createdCourse || createdCourse.length === 0) {
-        alert("Failed to create course. Please try again.");
-        return;
+    if (titleFreeText.trim()) {
+      const existingCourse = courses.find(c => c.title.toLowerCase() === titleFreeText.trim().toLowerCase());
+      if (existingCourse) {
+        finalCourseId = existingCourse.id;
+      } else {
+        const newCourse = { title: titleFreeText.trim(), code: "", user_id: user.id };
+        const createdCourse = await addCourse(newCourse);
+        if (!createdCourse || createdCourse.length === 0) {
+          alert("Failed to create course. Please try again.");
+          return;
+        }
+        finalCourseId = createdCourse[0].id;
+        // update courses state so the dropdown / display works correctly
+        setCourses(prev => [...prev, createdCourse[0]]);
       }
-
-      finalCourseId = createdCourse[0].id; // ✅ now TypeScript is happy
     }
 
-
-
     if (!finalCourseId) {
-      alert("Please select an existing course or enter a new course title.");
+      alert("Course is required.");
       return;
     }
 
