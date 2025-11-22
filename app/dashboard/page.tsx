@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import DarkModeToggle from "@/components/DarkModeToggle";
 import CoursesManager from "@/components/CoursesManager";
+import AssignmentsManager from "@/components/AssignmentsManager";
 
 
 
@@ -36,6 +37,7 @@ export default function DashboardPage() {
         </button>
       </header>
       <CoursesManager />
+      <AssignmentsManager />
 
 
       <main className="p-6">
