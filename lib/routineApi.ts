@@ -12,6 +12,8 @@ export interface Routine {
   location?: string;
   notes?: string;
   created_at: string;
+  duration?: number;  // in minutes
+  travel?: "Walk" | "Bike" | "Car";
 }
 
 export const addRoutine = async (data: Partial<Routine>) => {

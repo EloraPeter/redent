@@ -3,146 +3,94 @@ import { Routine } from "./routineApi";
 import { DateTime } from "luxon";
 
 // -----------------------------
-// CONFIG (defaults)
+// CONFIG
 // -----------------------------
 const DEFAULT_BUFFER_MINUTES = 5;
 
-const EMOTION = {
-    EARLY: "sparkle_happy",
-    ON_TIME: "normal_smile",
-    LATE: "worried_clock",
-    VERY_LATE: "cry_teary",
-    SNOOZE_HEAVY: "sleepy_pajamas",
-    WORRIED: "WORRIED"
+export const EMOTION = {
+  EARLY: "sparkle_happy",
+  ON_TIME: "normal_smile",
+  LATE: "worried_clock",
+  VERY_LATE: "cry_teary",
+  SNOOZE_HEAVY: "sleepy_pajamas",
+  WORRIED: "worried_face",
+};
 
+// Travel multipliers
+const travelMultiplier: Record<string, number> = {
+  Walk: 1.0,
+  Bike: 0.6,
+  Car: 0.5,
 };
 
 // -----------------------------
-// 1. Fetch today's routines
+// Fetch today's routines
 // -----------------------------
 export async function getTodaysRoutines(userId: string, day: string) {
-    const { data, error } = await supabase
-        .from("routines")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("day_of_week", day)
-        .order("position", { ascending: true });
+  const { data, error } = await supabase
+    .from("routines")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("day_of_week", day)
+    .order("position", { ascending: true });
 
-    if (error) throw error;
-    return data as Routine[];
+  if (error) throw error;
+  return (data as Routine[]).map(r => ({ ...r, duration: r.duration || 10, travel: r.travel || "Walk" }));
 }
 
 // -----------------------------
-// 2. Compute smart wake-up time
+// Calculate smart wakeup
 // -----------------------------
-export function calculateSmartWakeTime(routines: Routine[]) {
-    if (!routines.length) return null;
+export function calculateSmartWakeup(routines: (Routine & { duration?: number; travel?: string })[]) {
+  if (!routines.length) return null;
 
-    // Find earliest routine with valid start time
-    const morningRoutines = routines.filter(r => r.start_time !== null);
-    if (!morningRoutines.length) return null;
+  // Total prep time including travel
+  let totalPrepMinutes = routines.reduce((sum, r) => {
+    const dur = r.duration || 10;
+    const travel = r.travel || "Walk";
+    return sum + dur * (travelMultiplier[travel] || 1);
+  }, 0);
 
-    const earliest = morningRoutines.reduce((a, b) =>
-        a.start_time! < b.start_time! ? a : b
-    );
+  totalPrepMinutes += DEFAULT_BUFFER_MINUTES;
 
-    // Convert times to Luxon
-    const classStart = DateTime.fromFormat(earliest.start_time!, "HH:mm");
+  // Determine earliest routine with start_time if exists
+  const firstRoutineTime = routines[0].start_time
+    ? DateTime.fromFormat(routines[0].start_time!, "HH:mm")
+    : DateTime.now().plus({ minutes: 60 });
 
-    // Calculate total prep time using duration of each routine
-    let totalPrepMinutes = 0;
+  const wakeTime = firstRoutineTime.minus({ minutes: totalPrepMinutes });
 
-    for (const r of routines) {
-        if (r.start_time && r.end_time) {
-            const s = DateTime.fromFormat(r.start_time, "HH:mm");
-            const e = DateTime.fromFormat(r.end_time, "HH:mm");
-            const diff = e.diff(s, "minutes").minutes;
-
-            totalPrepMinutes += diff;
-        }
-    }
-
-    totalPrepMinutes += DEFAULT_BUFFER_MINUTES;
-
-    const wakeTime = classStart.minus({ minutes: totalPrepMinutes });
-
-    return {
-        earliestRoutine: earliest,
-        totalPrepMinutes,
-        wakeTime,
-        wakeTimeString: wakeTime.toFormat("HH:mm"),
+  // Build timeline
+  let currentTime = wakeTime;
+  const timeline = routines.map(r => {
+    const entry = {
+      label: r.title,
+      time: currentTime.toFormat("HH:mm"),
+      mochi: r.priority === "high" ? EMOTION.WORRIED : EMOTION.ON_TIME,
     };
+    const dur = r.duration || 10;
+    const travel = r.travel || "Walk";
+    currentTime = currentTime.plus({ minutes: dur * (travelMultiplier[travel] || 1) });
+    return entry;
+  });
+
+  return {
+    wakeTime,
+    wakeTimeString: wakeTime.toFormat("HH:mm"),
+    totalPrepMinutes,
+    timeline,
+  };
 }
 
 // -----------------------------
-// 3. Generate morning alert timeline
-// -----------------------------
-export function generateMorningTimeline(routines: Routine[], wakeTime: InstanceType<typeof DateTime>) {
-    const timeline = [];
-
-    // 1. Wake alert
-    timeline.push({
-        label: "Wake Up",
-        time: wakeTime.toFormat("HH:mm"),
-        mochi: EMOTION.ON_TIME,
-    });
-
-    // 2. Steps in order
-    for (const r of routines) {
-        if (r.start_time) {
-            timeline.push({
-                label: r.title,
-                time: r.start_time,
-                mochi: r.priority === "high" ? EMOTION.WORRIED : EMOTION.ON_TIME,
-            });
-        }
-    }
-
-    return timeline;
-}
-
-// -----------------------------
-// 4. Determine Mochi emotion
-// -----------------------------
-export function getMochiWakeEmotion(isLate: boolean, snoozes: number) {
-    if (snoozes >= 3) return EMOTION.SNOOZE_HEAVY;
-    if (isLate) return EMOTION.VERY_LATE;
-    return EMOTION.EARLY;
-}
-
-// -----------------------------
-// 5. Log wake event for streaks & weekly summary
-// -----------------------------
-export async function trackWakeEvent(userId: string, isLate: boolean, snoozes: number) {
-    const { error } = await supabase
-        .from("wake_logs")
-        .insert({
-            user_id: userId,
-            date: new Date().toISOString().split("T")[0],
-            late: isLate,
-            snoozes,
-        });
-
-    if (error) throw error;
-}
-
-// -----------------------------
-// MAIN FUNCTION USED BY APP
+// Main helper
 // -----------------------------
 export async function getSmartWakeup(userId: string) {
-    const today = DateTime.now().toFormat("cccc"); // Monday, Tuesday...
-    const routines = await getTodaysRoutines(userId, today);
-
-    const calc = calculateSmartWakeTime(routines);
-    if (!calc) return { routines, wake_time: null };
-
-    const timeline = generateMorningTimeline(routines, calc.wakeTime);
-
-    return {
-        routines,
-        wake_time: calc.wakeTimeString,
-        total_prep: calc.totalPrepMinutes,
-        earliest: calc.earliestRoutine,
-        timeline,
-    };
+  const today = DateTime.now().toFormat("cccc");
+  const routines = await getTodaysRoutines(userId, today);
+  const calc = calculateSmartWakeup(routines);
+  return {
+    routines,
+    ...calc,
+  };
 }
