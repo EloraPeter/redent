@@ -33,35 +33,38 @@ export default function RoutineManager() {
 
     const loadRoutines = async () => {
         if (!user) return;
-        const data = await fetchRoutines(user.id);
-        setRoutines(data);
+        try {
+            const data = await fetchRoutines(user.id);
+            setRoutines(data);
+        } catch (err: any) {
+            console.error("Failed to fetch routines:", err);
+        }
     };
 
     const handleAdd = async () => {
         if (!newRoutine.title || !user) return;
 
-        const position = routines.length;
+        try {
+            const position = routines.length;
 
-        const item = await addRoutine({
-            user_id: user.id,
-            title: newRoutine.title,
-            day_of_week: newRoutine.day_of_week!,
-            priority: newRoutine.priority!,
-            position,
-            location: newRoutine.location ?? "",
-            notes: newRoutine.notes ?? "",
-            start_time: newRoutine.start_time ?? null,
-            end_time: newRoutine.end_time ?? null,
-        });
+            const item = await addRoutine({
+                user_id: user.id,
+                title: newRoutine.title,
+                day_of_week: newRoutine.day_of_week!,
+                priority: newRoutine.priority!,
+                position,
+                location: newRoutine.location ?? "",
+                notes: newRoutine.notes ?? "",
+                start_time: newRoutine.start_time ?? null,
+                end_time: newRoutine.end_time ?? null,
+            });
 
-        setRoutines(prev => [...prev, item]);
-        setNewRoutine({ title: "", day_of_week: "Monday", priority: "normal" });
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!confirm("Delete this routine item?")) return;
-        await deleteRoutine(id);
-        setRoutines(prev => prev.filter(r => r.id !== id));
+            setRoutines(prev => [...prev, item]);
+            setNewRoutine({ title: "", day_of_week: "Monday", priority: "normal" });
+        } catch (err: any) {
+            console.error("Failed to add routine:", JSON.stringify(err, null, 2));
+            alert("Failed to add routine. Check console for details.");
+        }
     };
 
     const handleDragEnd = async (result: DropResult) => {
@@ -73,11 +76,15 @@ export default function RoutineManager() {
 
         setRoutines(items);
 
-        // Persist new positions
-        await Promise.all(
-            items.map((item, idx) => updateRoutine(item.id, { position: idx }))
-        );
+        try {
+            await Promise.all(
+                items.map((item, idx) => updateRoutine(item.id, { position: idx }))
+            );
+        } catch (err: any) {
+            console.error("Failed to update routine positions:", err);
+        }
     };
+
 
     const handleEditField = (id: string, field: keyof Routine, value: any) => {
         setRoutines(prev =>
@@ -130,26 +137,30 @@ export default function RoutineManager() {
 
             {/* Drag-and-drop list */}
             <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="routine-list">
-  {(provided: DroppableProvided) => (
-    <div {...provided.droppableProps} ref={provided.innerRef}>
-      {routines.map((r, index) => (
-        <Draggable key={r.id} draggableId={r.id} index={index}>
-          {(provided: DraggableProvided) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.draggableProps}
-              {...provided.dragHandleProps}
-            >
-              {r.title}
-            </div>
-          )}
-        </Draggable>
-      ))}
-      {provided.placeholder}
-    </div>
-  )}
-</Droppable>
+                <Droppable droppableId="routine-list" >
+                    {(provided: DroppableProvided) => (
+                        <div {...provided.droppableProps} ref={provided.innerRef}>
+                            {routines.map((r, index) =>
+                                r.id ? (
+                                    <Draggable key={r.id} draggableId={r.id} index={index}>
+                                        {(provided: DraggableProvided) => (
+                                            <div
+                                                ref={provided.innerRef}
+                                                {...provided.draggableProps}
+                                                {...provided.dragHandleProps}
+                                            >
+                                                {r.title}
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ) : null
+                            )}
+
+                            {provided.placeholder}
+                        </div>
+                    )}
+                </Droppable>
+
             </DragDropContext>
         </div>
     );
