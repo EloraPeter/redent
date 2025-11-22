@@ -1,13 +1,15 @@
-export const getPriorityColor = (dueDate: string) => {
-  const now = new Date();
-  const due = new Date(dueDate);
+// returns color hex for priority based on due date distance
+export function getPriorityColor(dueDateIso: string | undefined): string {
+  if (!dueDateIso) return "#9CA3AF"; // gray
 
-  const diffMs = due.getTime() - now.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  const diffDays = diffHours / 24;
+  const due = new Date(dueDateIso).getTime();
+  const now = Date.now();
+  const diff = due - now; // ms remaining
 
-  if (diffHours < 0) return "red";        // overdue
-  if (diffHours <= 24) return "red";      // due today or in <24h
-  if (diffDays <= 3) return "orange";     // 1–3 days
-  return "green";                         // >3 days
-};
+  if (diff <= 0) return "#ef4444"; // red - overdue
+  const days = diff / (1000 * 60 * 60 * 24);
+
+  if (days <= 1) return "#ef4444"; // red
+  if (days <= 3) return "#f97316"; // orange
+  return "#10b981"; // green
+}
