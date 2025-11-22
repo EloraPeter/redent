@@ -137,7 +137,7 @@ export default function RoutineManager() {
 
             {/* Drag-and-drop list */}
             <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="routine-list" >
+                <Droppable droppableId="routine-list">
                     {(provided: DroppableProvided) => (
                         <div {...provided.droppableProps} ref={provided.innerRef}>
                             {routines.map((r, index) =>
