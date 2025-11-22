@@ -137,7 +137,9 @@ export default function RoutineManager() {
 
             {/* Drag-and-drop list */}
             <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="routine-list">
+                <Droppable droppableId="routine-list"
+                    // @ts-expect-error react-beautiful-dnd types mismatch
+                    isDropDisabled={false}>
                     {(provided: DroppableProvided) => (
                         <div {...provided.droppableProps} ref={provided.innerRef}>
                             {routines.map((r, index) =>
