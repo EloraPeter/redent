@@ -1,3 +1,4 @@
+// lib/assignmentApi.ts
 import { supabase } from "./supabase";
 
 export type Assignment = {
@@ -6,50 +7,76 @@ export type Assignment = {
   user_id: string;
   title: string;
   description?: string;
-  due_date: string;
-  file_url?: string;
+  due_date: string; // ISO string / timestamp
+  file_url?: string; // storage path
+  status?: string;
   created_at?: string;
 };
 
-// Fetch assignments
-export const fetchAssignments = async (userId: string) => {
+// bucket name you'll create in Supabase UI
+const BUCKET = "assignments";
+
+export const fetchAssignments = async (userId: string): Promise<Assignment[]> => {
   const { data, error } = await supabase
     .from("assignments")
     .select("*")
     .eq("user_id", userId)
     .order("due_date", { ascending: true });
+
   if (error) throw error;
-  return data as Assignment[];
+  // null-safe cast
+  return (data ?? []) as Assignment[];
 };
 
-// Add assignment
-export const addAssignment = async (assignment: Partial<Assignment>, file?: File) => {
-  let file_url;
+export const addAssignment = async (
+  assignment: Partial<Assignment>,
+  file?: File
+): Promise<Assignment[]> => {
+  let file_url: string | undefined;
+
   if (file) {
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from("assignments")
-      .upload(`${Date.now()}_${file.name}`, file);
-    if (uploadError) throw uploadError;
+    // name the file uniquely (timestamp + original name)
+    const path = `${Date.now()}_${file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file);
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      throw uploadError;
+    }
+
     file_url = uploadData?.path;
   }
 
-  const { data, error } = await supabase
-    .from("assignments")
-    .insert([{ ...assignment, file_url }]);
-  if (error) throw error;
-return (data ?? []) as Assignment[];
+  const payload = { ...assignment, file_url };
+  const { data, error } = await supabase.from("assignments").insert([payload]);
+
+  if (error) {
+    console.error("DB insert error (addAssignment):", error);
+    throw error;
+  }
+
+  return (data ?? []) as Assignment[];
 };
 
-// Update assignment
-export const updateAssignment = async (id: string, updates: Partial<Assignment>, file?: File) => {
+export const updateAssignment = async (
+  id: string,
+  updates: Partial<Assignment>,
+  file?: File
+): Promise<Assignment[]> => {
   let file_url = updates.file_url;
+
   if (file) {
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from("assignments")
-      .upload(`${Date.now()}_${file.name}`, file, { upsert: true });
-    if (uploadError) throw uploadError;
+    const path = `${Date.now()}_${file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      console.error("Storage upload error (update):", uploadError);
+      throw uploadError;
+    }
     file_url = uploadData?.path;
   }
 
@@ -57,16 +84,29 @@ export const updateAssignment = async (id: string, updates: Partial<Assignment>,
     .from("assignments")
     .update({ ...updates, file_url })
     .eq("id", id);
-  if (error) throw error;
-return (data ?? []) as Assignment[];
+
+  if (error) {
+    console.error("DB update error (updateAssignment):", error);
+    throw error;
+  }
+
+  return (data ?? []) as Assignment[];
 };
 
-// Delete assignment
 export const deleteAssignment = async (id: string) => {
-  const { data, error } = await supabase
-    .from("assignments")
-    .delete()
-    .eq("id", id);
-  if (error) throw error;
+  const { data, error } = await supabase.from("assignments").delete().eq("id", id);
+  if (error) {
+    console.error("DB delete error (deleteAssignment):", error);
+    throw error;
+  }
   return data;
+};
+
+// helper: get public URL for a stored file (if your bucket is public)
+// returns string URL or undefined
+export const getAssignmentFilePublicUrl = (path?: string) => {
+  if (!path) return undefined;
+  // supabase-js v2: use .getPublicUrl
+const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+return data.publicUrl ?? undefined;
 };
