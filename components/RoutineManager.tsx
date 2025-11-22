@@ -8,6 +8,7 @@ import {
   updateRoutine,
   Routine,
 } from "@/lib/routineApi";
+import { getSmartWakeup } from "@/lib/smart-wakeup";
 
 import {
   DndContext,
@@ -35,8 +36,8 @@ const priorityColors: Record<string, string> = {
   normal: "gray",
 };
 
-// Individual draggable routine item
-function SortableRoutine({ routine }: { routine: Routine }) {
+// Draggable routine item
+function SortableRoutine({ routine, onUpdate }: { routine: Routine, onUpdate: (r: Routine) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: routine.id });
 
   const style = {
@@ -48,13 +49,30 @@ function SortableRoutine({ routine }: { routine: Routine }) {
     marginBottom: "4px",
     backgroundColor: priorityColors[routine.priority || "normal"],
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "column" as const,
+    gap: "4px",
   };
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {routine.title}
+      <div className="flex justify-between items-center">
+        <strong>{routine.title}</strong>
+        <span className="text-sm">{routine.priority}</span>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="time"
+          value={routine.start_time || ""}
+          onChange={(e) => onUpdate({ ...routine, start_time: e.target.value })}
+          className="p-1 border rounded flex-1"
+        />
+        <input
+          type="time"
+          value={routine.end_time || ""}
+          onChange={(e) => onUpdate({ ...routine, end_time: e.target.value })}
+          className="p-1 border rounded flex-1"
+        />
+      </div>
     </div>
   );
 }
@@ -67,6 +85,7 @@ export default function RoutineManager() {
     day_of_week: "Monday",
     priority: "normal",
   });
+  const [wakeupData, setWakeupData] = useState<any>(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -87,10 +106,8 @@ export default function RoutineManager() {
 
   const handleAdd = async () => {
     if (!newRoutine.title || !user) return;
-
     try {
       const position = routines.length;
-
       const item = await addRoutine({
         user_id: user.id,
         title: newRoutine.title,
@@ -102,12 +119,20 @@ export default function RoutineManager() {
         start_time: newRoutine.start_time ?? null,
         end_time: newRoutine.end_time ?? null,
       });
-
       setRoutines((prev) => [...prev, item]);
       setNewRoutine({ title: "", day_of_week: "Monday", priority: "normal" });
     } catch (err: any) {
-      console.error("Failed to add routine:", JSON.stringify(err, null, 2));
+      console.error("Failed to add routine:", err);
       alert("Failed to add routine. Check console for details.");
+    }
+  };
+
+  const handleUpdate = async (routine: Routine) => {
+    try {
+      const updated = await updateRoutine(routine.id, routine);
+      setRoutines((prev) => prev.map((r) => (r.id === routine.id ? updated : r)));
+    } catch (err: any) {
+      console.error("Failed to update routine:", err);
     }
   };
 
@@ -121,33 +146,32 @@ export default function RoutineManager() {
     const newRoutines = arrayMove(routines, oldIndex, newIndex);
     setRoutines(newRoutines);
 
-    // Update positions in the database
     try {
-      await Promise.all(
-        newRoutines.map((item, idx) => updateRoutine(item.id, { position: idx }))
-      );
+      await Promise.all(newRoutines.map((item, idx) => updateRoutine(item.id, { position: idx })));
     } catch (err: any) {
       console.error("Failed to update routine positions:", err);
     }
   };
 
+  const handleCalculateWakeup = async () => {
+    if (!user) return;
+    const data = await getSmartWakeup(user.id);
+    setWakeupData(data);
+  };
+
   return (
     <div className="p-4 space-y-4">
-      {/* Add new routine */}
+      {/* Add routine */}
       <div className="flex flex-col sm:flex-row gap-2 items-center">
         <input
           value={newRoutine.title}
-          onChange={(e) =>
-            setNewRoutine((prev) => ({ ...prev, title: e.target.value }))
-          }
+          onChange={(e) => setNewRoutine((prev) => ({ ...prev, title: e.target.value }))}
           placeholder="Title"
           className="p-2 border rounded flex-1"
         />
         <select
           value={newRoutine.day_of_week}
-          onChange={(e) =>
-            setNewRoutine((prev) => ({ ...prev, day_of_week: e.target.value }))
-          }
+          onChange={(e) => setNewRoutine((prev) => ({ ...prev, day_of_week: e.target.value }))}
           className="p-2 border rounded"
         >
           {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((day) => (
@@ -156,31 +180,50 @@ export default function RoutineManager() {
         </select>
         <select
           value={newRoutine.priority}
-          onChange={(e) =>
-            setNewRoutine((prev) => ({
-              ...prev,
-              priority: e.target.value as "high"|"medium"|"low"|"normal"
-            }))
-          }
+          onChange={(e) => setNewRoutine((prev) => ({ ...prev, priority: e.target.value as "high"|"medium"|"low"|"normal" }))}
           className="p-2 border rounded"
         >
-          {["high","medium","low","normal"].map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+          {["high","medium","low","normal"].map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <button onClick={handleAdd} className="p-2 bg-indigo-600 text-white rounded">
           Add
         </button>
       </div>
 
-      {/* Drag-and-drop list */}
+      {/* Routines list */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={routines.map((r) => r.id)} strategy={verticalListSortingStrategy}>
           {routines.map((routine) => (
-            <SortableRoutine key={routine.id} routine={routine} />
+            <SortableRoutine key={routine.id} routine={routine} onUpdate={handleUpdate} />
           ))}
         </SortableContext>
       </DndContext>
+
+      {/* Smart Wakeup */}
+      <div className="mt-4 p-4 border rounded space-y-2">
+        <button
+          onClick={handleCalculateWakeup}
+          className="p-2 bg-green-600 text-white rounded"
+        >
+          Calculate Smart Wakeup
+        </button>
+
+        {wakeupData && (
+          <div className="mt-2">
+            <div><strong>Wake Time:</strong> {wakeupData.wake_time}</div>
+            <div><strong>Total Prep Minutes:</strong> {wakeupData.total_prep}</div>
+            <div><strong>Earliest Routine:</strong> {wakeupData.earliest?.title}</div>
+            <div className="mt-2">
+              <strong>Timeline:</strong>
+              <ul className="list-disc ml-5">
+                {wakeupData.timeline.map((step: any, idx: number) => (
+                  <li key={idx}>{step.time} - {step.label} ({step.mochi})</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
