@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchAssignments, addAssignment, updateAssignment, deleteAssignment, Assignment } from "@/lib/assignmentApi";
 import { fetchCourses } from "@/lib/courseApi";
+import { getPriorityColor } from "@/lib/utils/priority";
+
 
 export default function AssignmentsManager() {
   const { user } = useAuth();
