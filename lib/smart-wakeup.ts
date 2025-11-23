@@ -38,6 +38,57 @@ export async function getTodaysRoutines(userId: string, day: string) {
   return (data as Routine[]).map(r => ({ ...r, duration: r.duration || 10, travel: r.travel || "Walk" }));
 }
 
+export async function getTodaysFirstClass(userId: string) {
+  const today = DateTime.local().toFormat("EEEE"); // Monday, Tuesday, etc.
+
+  const { data, error } = await supabase
+    .from("courses")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("day", today)
+    .order("start_time", { ascending: true })
+    .limit(1);
+
+  if (error) return null;
+
+  return data?.[0] || null;
+}
+
+export function calculateWakeupTime(classStart: string, prepMinutes: number) {
+  const start = DateTime.fromFormat(classStart, "HH:mm");
+
+  const wake = start.minus({ minutes: prepMinutes });
+
+  return wake.toFormat("HH:mm");
+}
+
+export async function getTotalPreparationTime(userId: string) {
+  const { data, error } = await supabase
+    .from("routine")
+    .select("duration")
+    .eq("user_id", userId);
+
+  if (error || !data) return 0;
+
+  const total = data.reduce((sum, item) => sum + (item.duration || 0), 0);
+
+  return total;
+}
+
+
+
+export async function getTodayWakeupTime(userId: string) {
+  const firstClass = await getTodaysFirstClass(userId);
+
+  if (!firstClass) return null; // No class today
+
+  // Sum all routine durations
+  const prepMinutes = await getTotalPreparationTime(userId);
+
+  return calculateWakeupTime(firstClass.start_time, prepMinutes);
+}
+
+
 // -----------------------------
 // Calculate smart wakeup
 // -----------------------------

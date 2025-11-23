@@ -10,6 +10,8 @@ import {
 } from "@/lib/routineApi";
 import { DateTime } from "luxon";
 import { getSmartWakeup, EMOTION } from "@/lib/smart-wakeup";
+import { getTodayWakeupTime } from "../lib/smart-wakeup";
+import { startMorningAlerts } from "../lib/morning-alerts";
 
 import {
   DndContext,
@@ -224,6 +226,18 @@ export default function RoutineManager() {
     calculateTimeline();
   }, [routines]);
 
+  const [wakeTime, setWakeTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadWakeTime() {
+      if (!user) return;
+      const time = await getTodayWakeupTime(user.id);
+      setWakeTime(time);
+    }
+    loadWakeTime();
+  }, []);
+
+
   return (
     <div className="p-4 space-y-4">
       {/* Add new routine */}
@@ -290,6 +304,14 @@ export default function RoutineManager() {
       </DndContext>
 
       {/* Smart Wakeup Timeline */}
+      {wakeTime ? (
+        <p className="text-lg font-semibold">
+          ⏰ You should wake up at <span className="text-blue-600">{wakeTime}</span>
+        </p>
+      ) : (
+        <p className="text-gray-500">No classes today 🎉</p>
+      )}
+
       {smartData && (
         <div className="mt-6 p-4 border rounded space-y-2">
           <h3 className="text-lg font-bold">Smart Wakeup: {smartData.wakeTime}</h3>
@@ -301,6 +323,24 @@ export default function RoutineManager() {
           ))}
         </div>
       )}
+
+      {/* morning alerts */}
+      <button
+        onClick={async () => {
+          if (!user) return;
+
+          if (Notification.permission !== "granted") {
+            await Notification.requestPermission();
+          }
+
+          startMorningAlerts(user.id);
+          alert("Morning assistant activated. Your reminders are set!");
+        }}
+        className="p-3 bg-blue-600 text-white rounded-lg w-full"
+      >
+        Activate Morning Assistant
+      </button>
+
     </div>
   );
 }
