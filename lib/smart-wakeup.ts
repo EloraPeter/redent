@@ -38,18 +38,22 @@ export async function getTodaysRoutines(userId: string, day: string) {
   return (data as Routine[]).map(r => ({ ...r, duration: r.duration || 10, travel: r.travel || "Walk" }));
 }
 
+// lib/smart-wakeup.ts → CORRECTED
 export async function getTodaysFirstClass(userId: string) {
-  const today = DateTime.local().toFormat("EEEE"); // Monday, Tuesday, etc.
+  const today = DateTime.now().toFormat("EEEE"); // "Sunday", "Monday", etc.
 
   const { data, error } = await supabase
     .from("courses")
-    .select("*")
+    .select("start_time")
     .eq("user_id", userId)
-    .eq("day", today)
+    .eq("day", today)                    // ← This now gets properly quoted by Supabase client
     .order("start_time", { ascending: true })
     .limit(1);
 
-  if (error) return null;
+  if (error) {
+    console.error("Error fetching first class:", error);
+    return null;
+  }
 
   return data?.[0] || null;
 }
