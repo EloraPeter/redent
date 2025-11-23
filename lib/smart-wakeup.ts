@@ -1,6 +1,8 @@
+// lib/smart-wakeup.ts
 import { supabase } from "./supabase";
 import { Routine } from "./routineApi";
 import { DateTime } from "luxon";
+
 
 // -----------------------------
 // CONFIG
@@ -16,7 +18,6 @@ export const EMOTION = {
   WORRIED: "worried_face",
 };
 
-// Travel multipliers
 const travelMultiplier: Record<string, number> = {
   Walk: 1.0,
   Bike: 0.6,
@@ -24,29 +25,40 @@ const travelMultiplier: Record<string, number> = {
 };
 
 // -----------------------------
-// Fetch today's routines
+// Fetch today's routines (plural!)
 // -----------------------------
 export async function getTodaysRoutines(userId: string, day: string) {
   const { data, error } = await supabase
-    .from("routines")
+    .from("routines")  // ← MUST BE "routines" (plural)
     .select("*")
     .eq("user_id", userId)
     .eq("day_of_week", day)
     .order("position", { ascending: true });
 
-  if (error) throw error;
-  return (data as Routine[]).map(r => ({ ...r, duration: r.duration || 10, travel: r.travel || "Walk" }));
+  if (error) {
+    console.error("Error fetching routines:", error);
+    return [];
+  }
+
+  return (data as Routine[]).map(r => ({
+    ...r,
+    duration: r.duration ?? 10,
+    travel: r.travel ?? "Walk",
+    priority: r.priority ?? "normal",
+  }));
 }
 
-// lib/smart-wakeup.ts → CORRECTED
+// -----------------------------
+// First class today
+// -----------------------------
 export async function getTodaysFirstClass(userId: string) {
-  const today = DateTime.now().toFormat("EEEE"); // "Sunday", "Monday", etc.
+  const today = DateTime.now().toFormat("EEEE"); // Sunday, Monday...
 
   const { data, error } = await supabase
     .from("courses")
     .select("start_time")
     .eq("user_id", userId)
-    .eq("day", today)                    // ← This now gets properly quoted by Supabase client
+    .eq("day", today) // ← Supabase client quotes this properly → no more 400!
     .order("start_time", { ascending: true })
     .limit(1);
 
@@ -58,94 +70,94 @@ export async function getTodaysFirstClass(userId: string) {
   return data?.[0] || null;
 }
 
-export function calculateWakeupTime(classStart: string, prepMinutes: number) {
-  const start = DateTime.fromFormat(classStart, "HH:mm");
-
-  const wake = start.minus({ minutes: prepMinutes });
-
-  return wake.toFormat("HH:mm");
-}
-
-export async function getTotalPreparationTime(userId: string) {
-  const { data, error } = await supabase
-    .from("routine")
-    .select("duration")
-    .eq("user_id", userId);
-
-  if (error || !data) return 0;
-
-  const total = data.reduce((sum, item) => sum + (item.duration || 0), 0);
-
-  return total;
-}
-
-
-
-export async function getTodayWakeupTime(userId: string) {
-  const firstClass = await getTodaysFirstClass(userId);
-
-  if (!firstClass) return null; // No class today
-
-  // Sum all routine durations
-  const prepMinutes = await getTotalPreparationTime(userId);
-
-  return calculateWakeupTime(firstClass.start_time, prepMinutes);
-}
-
-
 // -----------------------------
-// Calculate smart wakeup
+// Smart calculation (shared logic)
 // -----------------------------
-export function calculateSmartWakeup(routines: (Routine & { duration?: number; travel?: string })[]) {
-  if (!routines.length) return null;
+export function calculateSmartWakeup(
+  routines: (Routine & { duration?: number; travel?: string })[]
+) {
+  if (routines.length === 0) return null;
 
-  // Total prep time including travel
-  let totalPrepMinutes = routines.reduce((sum, r) => {
-    const dur = r.duration || 10;
-    const travel = r.travel || "Walk";
-    return sum + dur * (travelMultiplier[travel] || 1);
-  }, 0);
+  const totalPrepMinutes = routines.reduce((sum, r) => {
+    const dur = r.duration ?? 10;
+    const travel = r.travel ?? "Walk";
+    return sum + dur * (travelMultiplier[travel] ?? 1);
+  }, 0) + DEFAULT_BUFFER_MINUTES;
 
-  totalPrepMinutes += DEFAULT_BUFFER_MINUTES;
+  // Base time: first routine with start_time, or fallback
+  let baseTime = DateTime.now().plus({ hours: 2 });
 
-  // Determine earliest routine with start_time if exists
-  const firstRoutineTime = routines[0].start_time
-    ? DateTime.fromFormat(routines[0].start_time!, "HH:mm")
-    : DateTime.now().plus({ minutes: 60 });
+  if (routines[0]?.start_time) {
+    const parsed = DateTime.fromFormat(routines[0].start_time!, "HH:mm");
+    if (parsed.isValid) baseTime = parsed;
+  }
 
-  const wakeTime = firstRoutineTime.minus({ minutes: totalPrepMinutes });
+  const wakeTime = baseTime.minus({ minutes: Math.round(totalPrepMinutes) });
 
   // Build timeline
-  let currentTime = wakeTime;
+  let current = wakeTime;
   const timeline = routines.map(r => {
     const entry = {
       label: r.title,
-      time: currentTime.toFormat("HH:mm"),
+      time: current.toFormat("HH:mm"),
       mochi: r.priority === "high" ? EMOTION.WORRIED : EMOTION.ON_TIME,
     };
-    const dur = r.duration || 10;
-    const travel = r.travel || "Walk";
-    currentTime = currentTime.plus({ minutes: dur * (travelMultiplier[travel] || 1) });
+    const dur = (r.duration ?? 10) * (travelMultiplier[r.travel ?? "Walk"] ?? 1);
+    current = current.plus({ minutes: Math.round(dur) });
     return entry;
   });
 
   return {
     wakeTime,
     wakeTimeString: wakeTime.toFormat("HH:mm"),
-    totalPrepMinutes,
+    totalPrepMinutes: Math.round(totalPrepMinutes),
     timeline,
   };
 }
 
 // -----------------------------
-// Main helper
+// MAIN: Today's wake-up time (single source of truth!)
+// -----------------------------
+export async function getTodayWakeupTime(userId: string): Promise<string | null> {
+  const todayStr = DateTime.now().toFormat("EEEE");
+  const routines = await getTodaysRoutines(userId, todayStr);
+  const firstClass = await getTodaysFirstClass(userId);
+
+  // No class and no routines → sleep in!
+  if (!firstClass && routines.length === 0) return null;
+
+  // Priority: Class time > First routine with start_time > fallback
+  let baseTime = DateTime.now().plus({ hours: 2 });
+  if (firstClass?.start_time) {
+    const parsed = DateTime.fromFormat(firstClass.start_time, "HH:mm");
+    baseTime = parsed.isValid ? parsed : DateTime.now().plus({ hours: 2 });
+  } else if (routines[0]?.start_time) {
+    const parsed = DateTime.fromFormat(routines[0].start_time!, "HH:mm");
+    baseTime = parsed.isValid ? parsed : DateTime.now().plus({ hours: 2 });
+  } else {
+    baseTime = DateTime.now().plus({ hours: 2 });
+  }
+
+  const smart = calculateSmartWakeup(routines);
+  if (!smart) return null;
+
+  const wakeTime = baseTime.minus({ minutes: smart.totalPrepMinutes });
+
+  return wakeTime.toFormat("HH:mm");
+}
+
+// -----------------------------
+// Bonus: Full smart data (for UI timeline)
 // -----------------------------
 export async function getSmartWakeup(userId: string) {
-  const today = DateTime.now().toFormat("cccc");
+  const today = DateTime.now().toFormat("EEEE");
   const routines = await getTodaysRoutines(userId, today);
   const calc = calculateSmartWakeup(routines);
+  const wakeTime = await getTodayWakeupTime(userId);
+
   return {
     routines,
+    wakeTime,
     ...calc,
   };
 }

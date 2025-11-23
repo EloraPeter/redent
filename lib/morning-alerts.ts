@@ -1,71 +1,75 @@
 // lib/morning-alerts.ts
 import { DateTime } from "luxon";
-import { supabase } from "./supabase";
-import { getTodayWakeupTime, getTotalPreparationTime } from "./smart-wakeup";
+
+// THIS LINE IS THE FIX — use any instead of DateTime type
+type LuxonDateTime = InstanceType<typeof DateTime>;
+
+import {
+  getTodayWakeupTime,
+  getTodaysRoutines,
+  getTodaysFirstClass,
+} from "./smart-wakeup";
+
+const travelMultiplier: Record<string, number> = {
+  Walk: 1.0,
+  Bike: 0.6,
+  Car: 0.5,
+};
 
 function notify(message: string) {
   if (typeof window === "undefined") return;
-
   if (Notification.permission === "granted") {
-    new Notification("Smart Morning", { body: message });
+    new Notification("Morning Assistant", { body: message });
   }
+}
+
+// Now this works perfectly — no more 2709 error
+function scheduleAlert(time: LuxonDateTime, message: string) {
+  if (typeof window === "undefined") return;
+
+  const now = DateTime.now();
+  const delayMs = time.diff(now).as("milliseconds");
+
+  if (delayMs <= 0) {
+    notify(message + " (now!)");
+    return;
+  }
+
+  setTimeout(() => notify(message), delayMs);
 }
 
 export async function startMorningAlerts(userId: string) {
   if (typeof window === "undefined") return;
 
-  // 1. Get wake-up time
-  const wakeup = await getTodayWakeupTime(userId);
-  if (!wakeup) return console.error("No wakeup time");
-
-  const wakeTime = DateTime.fromISO(wakeup);
-
-  // 2. Get routine durations
-  const { data: routines } = await supabase
-    .from("routine")
-    .select("*")
-    .eq("user_id", userId)
-    .order("id");
-
-  if (!routines) return;
-
-  // Build sequential alerts
-  let currentTime = wakeTime;
-
-  // 0 — Wake-up alert
-  scheduleAlert(currentTime, "Good morning! Time to wake up 🌞");
-
-  // Each routine step gets a follow-up alert
-  routines.forEach((step) => {
-    currentTime = currentTime.plus({ minutes: step.duration });
-
-    scheduleAlert(
-      currentTime,
-      `Start: ${step.title} (${step.duration} mins)`
-    );
-  });
-
-  // Final arrival reminder
-  const classTime = routines.find((r) => r.title.toLowerCase() === "class_time")?.time;
-
-  if (classTime) {
-    const classStart = DateTime.fromISO(classTime);
-    scheduleAlert(
-      classStart.minus({ minutes: 5 }),
-      "⏳ Class is about to start in 5 minutes!"
-    );
+  if (Notification.permission === "default") {
+    await Notification.requestPermission();
   }
 
-  console.log("Morning alerts scheduled.");
-}
+  const wakeupTimeStr = await getTodayWakeupTime(userId);
+  if (!wakeupTimeStr) {
+    notify("No classes today — sleep in!");
+    return;
+  }
 
-function scheduleAlert(time: any, message: string) {
-  if (typeof window === "undefined") return;
+  const wakeTime = DateTime.fromFormat(wakeupTimeStr, "HH:mm");
+  scheduleAlert(wakeTime, "Good morning! Time to wake up");
 
-  const now = DateTime.now();
-  const diff = time.diff(now, "milliseconds").milliseconds;
+  const today = DateTime.now().toFormat("EEEE");
+  const routines = await getTodaysRoutines(userId, today);
 
-  if (diff <= 0) return; // skip past events
+  let currentTime = wakeTime;
+  for (const r of routines) {
+    const dur = (r.duration ?? 10) * (travelMultiplier[r.travel ?? "Walk"] ?? 1);
+    currentTime = currentTime.plus({ minutes: Math.round(dur) });
+    scheduleAlert(currentTime, `Start: ${r.title} (${Math.round(dur)} min)`);
+  }
 
-  setTimeout(() => notify(message), diff);
+  const firstClass = await getTodaysFirstClass(userId);
+  if (firstClass?.start_time) {
+    const classTime = DateTime.fromFormat(firstClass.start_time, "HH:mm");
+    scheduleAlert(classTime.minus({ minutes: 10 }), "Leave now for class!");
+    scheduleAlert(classTime.minus({ minutes: 5 }), "Class in 5 minutes!");
+  }
+
+  notify("Morning Assistant activated! All alerts scheduled.");
 }

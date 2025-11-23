@@ -11,7 +11,7 @@ import {
 import { DateTime } from "luxon";
 import { getSmartWakeup, EMOTION } from "@/lib/smart-wakeup";
 import { startMorningAlerts } from "../lib/morning-alerts";
-import { getTodayWakeupTime, getTotalPreparationTime } from "../lib/smart-wakeup";
+import { getTodayWakeupTime } from "../lib/smart-wakeup";
 
 import {
   DndContext,
